@@ -39,8 +39,8 @@ func ProxyRequestHandler(proxy *httputil.ReverseProxy, sh *shell.Shell) func(htt
 		if len(splitted) > 1 {
 			if splitted[1] == "ipfs" {
 				if len(splitted) > 2 {
-					log.Println("IPFS request: " + path)
-					log.Println("CID: " + splitted[2])
+					// log.Println("IPFS request: " + path)
+					// log.Println("CID: " + splitted[2])
 					cid := splitted[2]
 					_, size, err := getBlockSizeRecursive(cid, sh)
 					if err != nil {
@@ -55,7 +55,7 @@ func ProxyRequestHandler(proxy *httputil.ReverseProxy, sh *shell.Shell) func(htt
 						return
 					}
 
-					log.Println("Total size: " + strconv.Itoa(size))
+					// log.Println("Total size: " + strconv.Itoa(size))
 				}
 			}
 		}
@@ -77,7 +77,7 @@ func getBlockSizeRecursive(block string, sh *shell.Shell) (string, int, error) {
 			if !ok {
 				return block, totalSize, nil
 			}
-			log.Println("New ref: " + ref)
+			// log.Println("New ref: " + ref)
 			_, size, err := sh.BlockStat(ref)
 			if err != nil {
 				log.Println(err)
