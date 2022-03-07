@@ -50,7 +50,7 @@ func ProxyRequestHandler(proxy *httputil.ReverseProxy, sh *shell.Shell) func(htt
 					}
 
 					if int64(size) > totalAllowedSize {
-						log.Println("Total size exceeded for CID: " + cid)
+						log.Println("Total size of " + strconv.Itoa(size) + " exceeded for CID: " + cid)
 						w.WriteHeader(http.StatusForbidden)
 						return
 					}
