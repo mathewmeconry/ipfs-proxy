@@ -12,6 +12,11 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 )
 
+type CacheEntry struct {
+	Cid     string
+	Allowed bool
+}
+
 // NewProxy takes target host and creates a reverse proxy
 func NewProxy(targetHost string) (*httputil.ReverseProxy, error) {
 	url, err := url.Parse(targetHost)
@@ -26,6 +31,7 @@ func NewProxy(targetHost string) (*httputil.ReverseProxy, error) {
 func ProxyRequestHandler(proxy *httputil.ReverseProxy, sh *shell.Shell) func(http.ResponseWriter, *http.Request) {
 	totalAllowedSize, err := strconv.ParseInt(os.Getenv("MAX_SIZE_MB"), 10, 64)
 	totalAllowedSize = totalAllowedSize * 1024 * 1024
+	cache := []CacheEntry{}
 
 	if err != nil {
 		log.Println("Error:", err)
@@ -42,6 +48,22 @@ func ProxyRequestHandler(proxy *httputil.ReverseProxy, sh *shell.Shell) func(htt
 					// log.Println("IPFS request: " + path)
 					// log.Println("CID: " + splitted[2])
 					cid := splitted[2]
+
+					// check if the cid is in the cache
+					for _, entry := range cache {
+						if entry.Cid == cid {
+							if entry.Allowed {
+								// log.Println("CID is allowed")
+								proxy.ServeHTTP(w, r)
+								return
+							} else {
+								log.Println("CID is not allowed by cache " + cid)
+								w.WriteHeader(http.StatusForbidden)
+								return
+							}
+						}
+					}
+
 					_, size, err := getBlockSizeRecursive(cid, sh)
 					if err != nil {
 						log.Println(err)
@@ -52,10 +74,15 @@ func ProxyRequestHandler(proxy *httputil.ReverseProxy, sh *shell.Shell) func(htt
 					if int64(size) > totalAllowedSize {
 						log.Println("Total size of " + strconv.Itoa(size) + " exceeded for CID: " + cid)
 						w.WriteHeader(http.StatusForbidden)
+						cache = append(cache, CacheEntry{Cid: cid, Allowed: false})
 						return
 					}
-
+					cache = append(cache, CacheEntry{Cid: cid, Allowed: true})
 					// log.Println("Total size: " + strconv.Itoa(size))
+
+					if len(cache) > 2000 {
+						cache = cache[1:]
+					}
 				}
 			}
 		}
