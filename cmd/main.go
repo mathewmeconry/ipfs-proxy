@@ -76,7 +76,7 @@ func ProxyRequestHandler(proxy *httputil.ReverseProxy, sh *shell.Shell) func(htt
 						}
 					}
 
-					_, size, err := getBlockSizeRecursive(cid, sh)
+					blocks, size, err := getBlockSizeRecursive(cid, sh)
 					if err != nil {
 						log.Println(err)
 						w.WriteHeader(http.StatusInternalServerError)
@@ -86,13 +86,17 @@ func ProxyRequestHandler(proxy *httputil.ReverseProxy, sh *shell.Shell) func(htt
 					if int64(size) > totalAllowedSize {
 						log.Println("Total size of " + strconv.Itoa(size) + " exceeded for CID: " + cid)
 						w.WriteHeader(http.StatusForbidden)
-						cache = append(cache, CacheEntry{Cid: cid, Allowed: false})
+						for _, block := range blocks {
+							cache = append(cache, CacheEntry{Cid: block, Allowed: false})	
+						}
 						return
 					}
-					cache = append(cache, CacheEntry{Cid: cid, Allowed: true})
+					for _, block := range blocks {
+						cache = append(cache, CacheEntry{Cid: block, Allowed: true})	
+					}
 					log.Println("Total size: " + strconv.Itoa(size))
 
-					if len(cache) > 2000 {
+					if len(cache) > 10000 {
 						cache = cache[1:]
 					}
 				}
@@ -103,28 +107,29 @@ func ProxyRequestHandler(proxy *httputil.ReverseProxy, sh *shell.Shell) func(htt
 	}
 }
 
-func getBlockSizeRecursive(block string, sh *shell.Shell) (string, int, error) {
-	refsChan, err := sh.Refs(block, true)
+func getBlockSizeRecursive(block string, sh *shell.Shell) ([]string, int, error) {
+	list, err := sh.List(block)
 	if err != nil {
 		log.Println(err)
-		return "", 0, err
+		return []string{}, 0, err
 	}
 	totalSize := 0
-	for {
-		select {
-		case ref, ok := <-refsChan:
-			if !ok {
-				return block, totalSize, nil
-			}
-			// log.Println("New ref: " + ref)
-			_, size, err := sh.BlockStat(ref)
+	blocks := []string{}
+	blocks = append(blocks, block)
+	for _, ref := range list {
+		blocks = append(blocks, ref.Hash)
+		if ref.Type == 1 {
+			_, size, err := getBlockSizeRecursive(ref.Hash, sh)
 			if err != nil {
 				log.Println(err)
+				return []string{}, 0, err
 			}
 			totalSize += size
-			break
+		} else {
+			totalSize += int(ref.Size)
 		}
 	}
+	return blocks, totalSize, nil
 }
 
 func main() {
