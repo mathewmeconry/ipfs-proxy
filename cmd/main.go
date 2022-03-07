@@ -32,6 +32,11 @@ func ProxyRequestHandler(proxy *httputil.ReverseProxy, sh *shell.Shell) func(htt
 	totalAllowedSize, err := strconv.ParseInt(os.Getenv("MAX_SIZE_MB"), 10, 64)
 	totalAllowedSize = totalAllowedSize * 1024 * 1024
 	cache := []CacheEntry{}
+	allowedPermanent := map[string]bool{}
+	pins, _ := sh.Pins()
+	for cid := range pins {
+		allowedPermanent[cid] = true
+	}
 
 	if err != nil {
 		log.Println("Error:", err)
@@ -48,6 +53,13 @@ func ProxyRequestHandler(proxy *httputil.ReverseProxy, sh *shell.Shell) func(htt
 					// log.Println("IPFS request: " + path)
 					// log.Println("CID: " + splitted[2])
 					cid := splitted[2]
+
+					// check if cid is in pin list
+					if allowedPermanent[cid] {
+						// log.Println("CID is in pin list")
+						proxy.ServeHTTP(w, r)
+						return
+					}
 
 					// check if the cid is in the cache
 					for _, entry := range cache {
@@ -78,7 +90,7 @@ func ProxyRequestHandler(proxy *httputil.ReverseProxy, sh *shell.Shell) func(htt
 						return
 					}
 					cache = append(cache, CacheEntry{Cid: cid, Allowed: true})
-					// log.Println("Total size: " + strconv.Itoa(size))
+					log.Println("Total size: " + strconv.Itoa(size))
 
 					if len(cache) > 2000 {
 						cache = cache[1:]
