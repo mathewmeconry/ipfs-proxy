@@ -35,6 +35,7 @@ func ProxyRequestHandler(proxy *httputil.ReverseProxy, sh *shell.Shell) func(htt
 	allowedPermanent := map[string]bool{}
 	pins, _ := sh.Pins()
 	for cid := range pins {
+		log.Println("Allowing permanently: " + cid)
 		allowedPermanent[cid] = true
 	}
 
@@ -94,7 +95,6 @@ func ProxyRequestHandler(proxy *httputil.ReverseProxy, sh *shell.Shell) func(htt
 					for _, block := range blocks {
 						cache = append(cache, CacheEntry{Cid: block, Allowed: true})	
 					}
-					log.Println("Total size: " + strconv.Itoa(size))
 
 					if len(cache) > 10000 {
 						cache = cache[1:]
